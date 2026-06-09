@@ -53,7 +53,3 @@ curl https://example.com/image.png | cli-mage
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
-
----
-
-*A [Yerette Group](https://github.com/yerettegroup) project.*
