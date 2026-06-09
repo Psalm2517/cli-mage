@@ -1,8 +1,4 @@
-```
-    *
-   /|\  cli-mage
-  /___\  image → ascii
-```
+![mage](mage.svg)
 
 # cli-mage
 
