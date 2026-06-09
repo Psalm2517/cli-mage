@@ -1,4 +1,4 @@
-![mage](mage.svg)
+![cli-mage](cli-mage.png)
 
 # cli-mage
 
@@ -51,6 +51,8 @@ curl https://example.com/image.png | cli-mage
 - Node.js 18 or later
 
 ---
+
+![yerette](mage.svg)
 
 ## License
 
