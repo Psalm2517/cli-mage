@@ -1,6 +1,6 @@
 ![cli-mage](cli-mage.png)
 
-# cli-mage
+# cli-mage ✦
 
 A magical CLI tool that converts images to ASCII art in your terminal.
 
