@@ -29,6 +29,7 @@ function ansiColor(text, r, g, b) {
   return `\x1b[38;2;${r};${g};${b}m${text}\x1b[0m`;
 }
 
+
 function hslToRgb(h, s, l) {
   const c = (1 - Math.abs(2 * l - 1)) * s;
   const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
@@ -110,7 +111,7 @@ function buildLines(image, opts, phase = 0) {
           }
         }
 
-        const ch = String.fromCodePoint(0x2800 + bits);
+        const ch = bits === 0 ? ' ' : String.fromCodePoint(0x2800 + bits);
         plain += ch;
 
         const { r, g, b } = intToRGBA(image.getPixelColor(Math.min(W-1, pxBase), Math.min(H-1, pyBase)));
@@ -195,16 +196,70 @@ function readStdin() {
   });
 }
 
-// ── Load animated GIF frames via gifwrap ───────────────────────────────────
+// ── Load animated GIF frames via gifwrap (with compositing) ───────────────
 async function loadGifFrames(srcPath, pixelWidth) {
   const { GifUtil } = require('gifwrap');
   const gif = await GifUtil.read(srcPath);
-  return gif.frames.map(frame => {
-    const img = new Jimp({ width: frame.bitmap.width, height: frame.bitmap.height });
-    img.bitmap.data = Buffer.from(frame.bitmap.data);
+  const { width: gW, height: gH } = gif;
+
+  // Canvas persists across frames — each frame is composited onto it
+  const canvas = Buffer.alloc(gW * gH * 4, 0);
+  const result = [];
+
+  for (const frame of gif.frames) {
+    const { xOffset = 0, yOffset = 0, disposalMethod = 0 } = frame;
+    const fw = frame.bitmap.width;
+    const fh = frame.bitmap.height;
+    const src = frame.bitmap.data;
+
+    // Save canvas state before drawing (needed for disposal method 3)
+    const prevCanvas = disposalMethod === 3 ? Buffer.from(canvas) : null;
+
+    // Composite frame onto canvas (bounds-checked for delta frames)
+    for (let y = 0; y < fh; y++) {
+      const dy = yOffset + y;
+      if (dy >= gH) continue;
+      for (let x = 0; x < fw; x++) {
+        const dx = xOffset + x;
+        if (dx >= gW) continue;
+        const si = (y * fw + x) * 4;
+        const di = (dy * gW + dx) * 4;
+        if (src[si + 3] > 0) {
+          canvas[di]     = src[si];
+          canvas[di + 1] = src[si + 1];
+          canvas[di + 2] = src[si + 2];
+          canvas[di + 3] = src[si + 3];
+        }
+      }
+    }
+
+    // Snapshot composited canvas as a Jimp image
+    // Use canvas.copy() into the pre-allocated bitmap buffer (avoids reference swap issues in Jimp 1.x)
+    const img = new Jimp({ width: gW, height: gH });
+    canvas.copy(img.bitmap.data, 0, 0, gW * gH * 4);
     img.resize({ w: pixelWidth });
-    return { image: img, delayMs: (frame.delayCentisecs || 10) * 10 };
-  });
+    result.push({ image: img, delayMs: (frame.delayCentisecs || 10) * 10 });
+
+    // Handle disposal method after snapshotting
+    if (disposalMethod === 2) {
+      // Restore to background — clear frame area (bounds-checked)
+      for (let y = 0; y < fh; y++) {
+        const dy = yOffset + y;
+        if (dy >= gH) continue;
+        for (let x = 0; x < fw; x++) {
+          const dx = xOffset + x;
+          if (dx >= gW) continue;
+          const di = (dy * gW + dx) * 4;
+          canvas[di] = canvas[di+1] = canvas[di+2] = canvas[di+3] = 0;
+        }
+      }
+    } else if (disposalMethod === 3 && prevCanvas) {
+      // Restore to previous canvas state
+      prevCanvas.copy(canvas);
+    }
+  }
+
+  return result;
 }
 
 // ── Main entry point ───────────────────────────────────────────────────────
@@ -227,33 +282,42 @@ async function convertImage(srcPath, options) {
   const isGifInput = !useStdin && srcPath.toLowerCase().endsWith('.gif');
   if (isGifInput) {
     let gifFrames;
-    try { gifFrames = await loadGifFrames(srcPath, pixelWidth); }
+
+    // Clamp width so rendered height fits inside the terminal
+    const termRows = process.stdout.rows || 40;
+    const termCols = process.stdout.columns || 120;
+    const gifInfo = require('gifwrap').GifUtil.read(srcPath);
+    const { width: gW, height: gH } = (await gifInfo);
+    const maxWidthByHeight = Math.floor((termRows - 2) * gW / (gH * CHAR_ASPECT));
+    const gifPixelWidth = Math.max(10, Math.min(pixelWidth, termCols, maxWidthByHeight));
+
+    try { gifFrames = await loadGifFrames(srcPath, gifPixelWidth); }
     catch { throw new Error(`Cannot read GIF: ${srcPath}`); }
 
     if (gifFrames.length > 1) {
-      // Render all frames up front
-      const rendered = gifFrames.map(({ image, delayMs }) => ({
-        lines: buildLines(image, renderOpts, 0),
-        delayMs,
-      }));
+      // Pre-build every frame as a single string — zero work during playback
+      const MIN_DELAY = 50; // cap at ~20fps, anything faster looks like noise
+      const rendered = gifFrames.map(({ image, delayMs }) => {
+        const lines = buildLines(image, renderOpts, 0);
+        const buf = '\x1b[H' + lines.map(l => '  ' + l.colored).join('\n') + '\n';
+        return { buf, delayMs: Math.max(MIN_DELAY, delayMs) };
+      });
 
-      const displayWidth = gifFrames[0].image.bitmap.width;
-      const lineCount = rendered[0].lines.length + 4;
       let frameIdx = 0;
 
-      printLines(rendered[0].lines, displayWidth);
+      process.stdout.write('\x1b[?1049h\x1b[?25l\x1b[H\x1b[2J');
+      process.stdout.write(rendered[0].buf);
 
       const tick = () => {
         frameIdx = (frameIdx + 1) % rendered.length;
-        const { lines, delayMs } = rendered[frameIdx];
-        process.stdout.write(`\x1b[${lineCount}A`);
-        printLines(lines, displayWidth);
+        const { buf, delayMs } = rendered[frameIdx];
+        process.stdout.write(buf);
         setTimeout(tick, delayMs);
       };
       setTimeout(tick, rendered[0].delayMs);
 
       process.on('SIGINT', () => {
-        process.stdout.write('\n');
+        process.stdout.write('\x1b[?25h\x1b[?1049l');
         console.log(chalk.hex('#a78bfa')('  ✦ Spell complete.\n'));
         process.exit(0);
       });
@@ -280,20 +344,24 @@ async function convertImage(srcPath, options) {
   if (animate) {
     let phase = 0;
     const FRAMES = 20;
-    let lines = render(0);
-    printLines(lines, displayWidth);
-    const lineCount = lines.length + 4;
+
+    const drawFrame = (lines) => {
+      let buf = '\x1b[H';
+      for (const { colored } of lines) buf += '  ' + colored + '\n';
+      process.stdout.write(buf);
+    };
+
+    process.stdout.write('\x1b[?1049h\x1b[?25l\x1b[2J');
+    drawFrame(render(0));
 
     const tick = setInterval(() => {
       phase = (phase + 1 / FRAMES) % 1;
-      lines = render(phase);
-      process.stdout.write(`\x1b[${lineCount}A`);
-      printLines(lines, displayWidth);
+      drawFrame(render(phase));
     }, 100);
 
     process.on('SIGINT', () => {
       clearInterval(tick);
-      process.stdout.write('\n');
+      process.stdout.write('\x1b[?25h\x1b[?1049l');
       console.log(chalk.hex('#a78bfa')('  ✦ Spell complete.\n'));
       process.exit(0);
     });

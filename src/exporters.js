@@ -2,8 +2,13 @@
 
 const fs = require('fs');
 
+function escapeMarkup(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 // ── HTML ───────────────────────────────────────────────────────────────────
 function toHtml(lines, filePath, title = 'cli-mage') {
+  title = escapeMarkup(title);
   const rows = lines.map(({ cells }) => {
     const spans = cells.map(({ ch, r, g, b }) => {
       const esc = ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch === '&' ? '&amp;' : ch;
@@ -37,6 +42,7 @@ ${rows}
 
 // ── SVG ────────────────────────────────────────────────────────────────────
 function toSvg(lines, filePath, title = 'cli-mage') {
+  title = escapeMarkup(title);
   const CHAR_W = 7;
   const CHAR_H = 13;
   const LINE_H = 14;
