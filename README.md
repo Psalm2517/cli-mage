@@ -1,6 +1,6 @@
 <div align="center">
 
-![cli-mage](cli-mage.png)
+![cli-mage](cli-mage.png?v=2)
 
 # cli-mage ✦
 
