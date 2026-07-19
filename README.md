@@ -11,7 +11,7 @@
 [![Offline](https://img.shields.io/badge/works-offline-blue.svg)](#requirements)
 
 ```
-npm install -g github:yerettegroup/cli-mage
+npm install -g github:psalm2517/cli-mage
 ```
 
 </div>
@@ -32,7 +32,7 @@ cli-mage photo.png --save mage.gif
 cli-mage photo.png --save mage.svg
 cli-mage photo.png --save mage.html
 cli-mage animation.gif
-cli-mage qr "https://yerettegroup.com"
+cli-mage qr "https://example.com"
 curl https://example.com/image.png | cli-mage
 ```
 
@@ -68,7 +68,7 @@ cli-mage qr <text or URL> [options]
 | `-o, --output <file>` | Save plain-text output to file |
 | `--save <file>` | Save as `.html` or `.svg` |
 
-Works fully offline — no internet required.
+Works fully offline, no internet required.
 
 ---
 
