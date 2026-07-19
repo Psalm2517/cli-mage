@@ -1,12 +1,20 @@
+<div align="center">
+
 ![cli-mage](cli-mage.png)
 
 # cli-mage ✦
 
-A magical CLI tool that converts images to ASCII art in your terminal.
+**A magical CLI tool that converts images to ASCII art in your terminal.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18-339933.svg?logo=node.js&logoColor=white)](https://nodejs.org)
+[![Offline](https://img.shields.io/badge/works-offline-blue.svg)](#requirements)
 
 ```
 npm install -g github:yerettegroup/cli-mage
 ```
+
+</div>
 
 ---
 
@@ -72,8 +80,12 @@ Works fully offline — no internet required.
 
 ## License
 
-cli-mage is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+cli-mage is licensed under the [MIT License](./LICENSE).
 
 Contact: [hello@yerettegroup.com](mailto:hello@yerettegroup.com)
 
+<div align="center">
+
 ![yerette](mage.svg)
+
+</div>
