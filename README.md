@@ -82,10 +82,6 @@ Works fully offline — no internet required.
 
 cli-mage is licensed under the [MIT License](./LICENSE).
 
-Contact: [hello@yerettegroup.com](mailto:hello@yerettegroup.com)
-
 <div align="center">
-
-![yerette](mage.svg)
 
 </div>
